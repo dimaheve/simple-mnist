@@ -1,88 +1,55 @@
-import numpy as np
-import struct
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 
-def read_images(filename):
-    with open(filename, 'rb') as f:
-        magic, num, rows, cols = struct.unpack(">IIII", f.read(16))
-        images = np.fromfile(f, dtype=np.uint8).reshape(num, rows, cols)
-    return images
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, using CPU")
 
-def read_labels(filename):
-    with open(filename, 'rb') as f:
-        magic, num = struct.unpack(">II", f.read(8))
-        labels = np.fromfile(f, dtype=np.uint8)
-    return labels
+class SimpleNN(nn.Module):
+    def __init__(self):
+        super(SimpleNN, self).__init__()
+        self.flatten = torch.nn.Flatten()
+        self.fc1 = torch.nn.Linear(28*28, 128) 
+        self.fc2 = torch.nn.Linear(128, 64) 
+        self.fc3 = torch.nn.Linear(64, 10)   
 
-train_images = read_images('./data/train_mnist')
-train_labels = read_labels('./data/train_mnist_labels')
+    def forward(self, x):
+        x = self.flatten(x)
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)  
+        return x
 
-def ReLU(z):
-    return np.maximum(0, z)
+transform = transforms.Compose([transforms.ToTensor(),
+                                transforms.Normalize((0.5,), (0.5,))])
 
-def dReLU(z):
-    return np.where(z > 0, 1, 0)
+train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 
-def softmax(x):
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=0)
+model = SimpleNN().to(device)
+model.load_state_dict(torch.load('mnist_model.pth'))
+criterion = nn.CrossEntropyLoss() # includes softmax
+optimizer = optim.Adam(model.parameters(), lr=0.00005)
 
-class NeuralNetwork:
-    def __init__(self) -> None:
-        self.weights = [
-            np.random.randn(32, 784),
-            np.random.randn(32, 32),
-            np.random.randn(10, 32)
-        ]
+epochs = 5
+for epoch in range(epochs):
+    running_loss = 0.0
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+        optimizer.zero_grad()
+        output = model(images)
+        loss = criterion(output, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
+    print(f"Epoch {epoch+1}/{epochs} - Loss: {running_loss / len(train_loader)}")
 
-        self.biases = [
-            np.random.randn(32),
-            np.random.randn(32),
-            np.random.randn(10)
-        ]
+torch.save(model.state_dict(), './mnist_model.pth')
 
-        self.activations = [
-            np.zeros(32),
-            np.zeros(32),
-            np.zeros(10)
-        ]
-
-    def forward(self, x) -> np.ndarray:
-        for i in range(len(self.weights)):
-            if i == 0:
-                preactivated_neuron = np.dot(self.weights[i], x) + self.biases[i]
-                activated_neuron = ReLU(preactivated_neuron)
-                self.activations[i] = {"preactivated_neuron": preactivated_neuron, "activated_neuron": activated_neuron}
-                continue
-            else:
-                preactivated_neuron = np.dot(self.weights[i], self.activations[i - 1]["activated_neuron"]) + self.biases[i]
-                activated_neuron = ReLU(preactivated_neuron)
-                self.activations[i] = {"preactivated_neuron": preactivated_neuron, "activated_neuron": activated_neuron}
-                continue
-
-        return softmax(self.activations[len(self.weights)-1]["activated_neuron"])
-    
-    def backwards(self, x, y) -> np.ndarray:
-        actual = np.zeros(10); actual[y] = 1
-        predicted = self.forward(x)
-        loss = predicted - actual
-
-        gradients = {
-            "weights": [np.zeros_like(w) for w in self.weights],
-            "biases": [np.zeros_like(b) for b in self.biases]
-        }
-
-        for i in range(gradients["weights"][2].shape[0]):
-            up_gradient = dReLU(self.activations[2]["preactivated_neuron"][i]) * loss[i]
-            gradients["biases"][2][i] = up_gradient
-            for j in range(gradients["weights"][2].shape[1]):
-                gradients["weights"][2][i, j] = up_gradient * self.activations[1]["activated_neuron"][j]
-        
-        return gradients
-
-
-
-nn = NeuralNetwork()
-print(nn.forward(train_images[0, :, :].reshape(784) / 255))
-print(train_labels[0])
-print(nn.activations[2]["preactivated_neuron"][0])
-print(nn.backwards(train_images[0, :, :].reshape(784) / 255, train_labels[0])["biases"][2])
+print("Training complete.")
