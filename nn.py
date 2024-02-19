@@ -33,7 +33,7 @@ train_dataset = datasets.MNIST(root='./data', train=True, download=True, transfo
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 
 model = SimpleNN().to(device)
-model.load_state_dict(torch.load('mnist_model.pth'))
+model.load_state_dict(torch.load('./data/mnist_model.pth'))
 criterion = nn.CrossEntropyLoss() # includes softmax
 optimizer = optim.Adam(model.parameters(), lr=0.00005)
 
@@ -50,6 +50,6 @@ for epoch in range(epochs):
         running_loss += loss.item()
     print(f"Epoch {epoch+1}/{epochs} - Loss: {running_loss / len(train_loader)}")
 
-torch.save(model.state_dict(), './mnist_model.pth')
+torch.save(model.state_dict(), './data/mnist_model.pth')
 
 print("Training complete.")

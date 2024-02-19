@@ -21,7 +21,7 @@ class SimpleNN(torch.nn.Module):
         return x
 
 model = SimpleNN()
-model.load_state_dict(torch.load('mnist_model.pth'))
+model.load_state_dict(torch.load('./data/mnist_model.pth'))
 model.eval() 
 
 transform = transforms.Compose([transforms.ToTensor(), 

@@ -30,6 +30,17 @@ def calculate_accuracy(model, X_test, Y_test):
     accuracy = np.mean(correct_predictions)
     return accuracy
 
+def train_model(learning_rate, epochs, batch_size, n_batches, model, train_mnist, train_mnist_labels, filename):
+    for epoch in range(epochs):
+        for i in range(n_batches):
+            start = i * batch_size
+            end = start + batch_size
+            X, Y = train_mnist[start:end], train_mnist_labels[start:end]
+            grads = model.backward_propagation(X, Y)
+            model.update_params(grads, learning_rate)
+        print(f"Epoch {epoch+1}/{epochs} - Loss: {model.compute_loss(model.forward_propagation(train_mnist), train_mnist_labels)}")
+    save_model_weights(model, filename)
+
 train_mnist = read_images('./data/train_mnist'); train_mnist = train_mnist.reshape(train_mnist.shape[0], -1).astype(np.float32) / 255.0
 train_mnist_labels = one_hot_encode(read_labels('./data/train_mnist_labels'))
 test_mnist = read_images('./data/test_mnist'); test_mnist = test_mnist.reshape(test_mnist.shape[0], -1).astype(np.float32) / 255.0
@@ -133,23 +144,14 @@ model = MNIST_NN([
     {"input_dim": 64, "output_dim": 10, "activation": "softmax"}
 ])
 
-load_model_weights(model, filename="./data/model_weights_:).npz")
+load_model_weights(model, "./data/model_weights_:).npz")
 print("Model initialized.")
 learning_rate = 0.01
 epochs = 20
 batch_size = 64
 n_batches = train_mnist.shape[0] // batch_size
 
-for epoch in range(epochs):
-    for i in range(n_batches):
-        start = i * batch_size
-        end = start + batch_size
-        X, Y = train_mnist[start:end], train_mnist_labels[start:end]
-        grads = model.backward_propagation(X, Y)
-        model.update_params(grads, learning_rate)
-    print(f"Epoch {epoch+1}/{epochs} - Loss: {model.compute_loss(model.forward_propagation(train_mnist), train_mnist_labels)}")
+#train_model(learning_rate, epochs, batch_size, n_batches, model, train_mnist, train_mnist_labels, "./data/model_weights_:).npz")
 
 accuracy = calculate_accuracy(model, test_mnist, test_mnist_labels)
 print(f"Test Accuracy: {accuracy * 100}%")
-
-save_model_weights(model, filename="./data/model_weights_:).npz")
